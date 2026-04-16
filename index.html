@@ -4,33 +4,47 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Diet Tracker</title>
+    
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Babel for compiling JSX directly in the browser -->
+    
+    <!-- Babel (ตัวแปลงภาษา React ให้รันบน Browser ได้) -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <!-- Import Map: บอก Browser ว่าจะโหลด Package ต่างๆ จากที่ไหน -->
+    <script type="importmap">
+    {
+        "imports": {
+            "react": "https://esm.sh/react@18.2.0",
+            "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
+            "lucide-react": "https://esm.sh/lucide-react@0.344.0?external=react",
+            "firebase/app": "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js",
+            "firebase/auth": "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js",
+            "firebase/firestore": "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js"
+        }
+    }
+    </script>
+
     <style>
-        .no-scrollbar::-webkit-scrollbar {
-            display: none;
-        }
-        .no-scrollbar {
-            -ms-overflow-style: none;
-            scrollbar-width: none;
-        }
+        /* ซ่อน Scrollbar แต่ยังเลื่อนได้ */
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
     </style>
 </head>
 <body class="bg-[#F2F2F7]">
-    <!-- จุดที่แอปพลิเคชันจะแสดงผล -->
+    
+    <!-- จุดที่แอปพลิเคชันจะไปแสดงผล -->
     <div id="root"></div>
 
-    <!-- โค้ด React จะทำงานในส่วนนี้ -->
+    <!-- โค้ดส่วนระบบทั้งหมด ต้องอยู่ข้างในแท็ก script นี้เท่านั้น -->
     <script type="text/babel" data-type="module">
-        import React, { useState, useEffect, useMemo } from 'https://esm.sh/react@18.2.0';
-        import { createRoot } from 'https://esm.sh/react-dom@18.2.0/client';
-        import { Calendar as CalendarIcon, PieChart, Plus, Trash2, ChevronLeft, ChevronRight, Activity, Utensils, Flame, ChevronUp, ChevronDown, X, Wifi, WifiOff } from 'https://esm.sh/lucide-react@0.344.0';
+        import React, { useState, useEffect, useMemo } from 'react';
+        import { createRoot } from 'react-dom/client';
+        import { Calendar as CalendarIcon, PieChart, Plus, Trash2, ChevronLeft, ChevronRight, Activity, Utensils, Flame, ChevronUp, ChevronDown, X, Wifi, WifiOff } from 'lucide-react';
         
-        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js';
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
-        import { getFirestore, collection, onSnapshot, doc, setDoc, deleteDoc } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
+        import { initializeApp } from 'firebase/app';
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from 'firebase/auth';
+        import { getFirestore, collection, onSnapshot, doc, setDoc, deleteDoc } from 'firebase/firestore';
 
         // --- Firebase Initialization ---
         const providedConfig = {
