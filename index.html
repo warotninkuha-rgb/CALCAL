@@ -1,614 +1,603 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { initializeApp } from 'firebase/app';
-import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from 'firebase/auth';
-import { getFirestore, collection, onSnapshot, doc, setDoc, deleteDoc } from 'firebase/firestore';
-import { Calendar as CalendarIcon, PieChart, Plus, Trash2, ChevronLeft, ChevronRight, Activity, Utensils, Flame, ChevronUp, ChevronDown, X, Wifi, WifiOff } from 'lucide-react';
-
-// --- Firebase Initialization ---
-// ใช้ Config ที่ให้มา หรืออ้างอิงจาก Environment Variable หากมีการกำหนดไว้ล่วงหน้า
-const providedConfig = {
-  apiKey: "AIzaSyBKFHNinm5U7KtwBWAATrDgmjcCdDYlePQ",
-  authDomain: "calorie-calculator-8e43a.firebaseapp.com",
-  projectId: "calorie-calculator-8e43a",
-  storageBucket: "calorie-calculator-8e43a.firebasestorage.app",
-  messagingSenderId: "189331388163",
-  appId: "1:189331388163:web:3000a88193c7bf91ea9b36"
-};
-const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : providedConfig;
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
-const globalAppId = typeof __app_id !== 'undefined' ? __app_id : 'calorie-calculator-8e43a';
-
-// --- Subcomponents ---
-
-// Component สำหรับแสดงรายการอาหารแต่ละรายการ
-const FoodItem = ({ food, onUpdate, onRemove }) => {
-  const [name, setName] = useState(food.name);
-  const [kcal, setKcal] = useState(food.kcal);
-
-  const handleBlur = () => {
-    if (name !== food.name || Number(kcal) !== food.kcal) {
-      onUpdate({ ...food, name, kcal: Number(kcal) });
-    }
-  };
-
-  return (
-    <div className="flex items-center gap-2 mb-2 bg-gray-50 p-2 rounded-xl border border-gray-100">
-      <div className="flex-1">
-        <input
-          type="text"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          onBlur={handleBlur}
-          placeholder="Food name (e.g., Chicken Breast)"
-          className="w-full bg-transparent text-sm outline-none text-gray-800 placeholder-gray-400"
-        />
-      </div>
-      <div className="w-20">
-        <div className="flex items-center bg-white rounded-lg px-2 py-1 shadow-sm border border-gray-200">
-          <input
-            type="number"
-            value={kcal}
-            onChange={(e) => setKcal(e.target.value)}
-            onBlur={handleBlur}
-            placeholder="Kcal"
-            className="w-full bg-transparent text-sm text-right outline-none text-gray-800"
-          />
-        </div>
-      </div>
-      <button onClick={onRemove} className="p-2 text-red-400 hover:text-red-600 transition-colors">
-        <Trash2 size={16} />
-      </button>
-    </div>
-  );
-};
-
-// Component สำหรับแสดง Card รายวัน
-const DayCard = ({ dayData, onUpdate, onDelete }) => {
-  const [tdee, setTdee] = useState(dayData.tdee);
-  const [dateStr, setDateStr] = useState(dayData.date);
-
-  const handleTdeeBlur = () => {
-    if (Number(tdee) !== dayData.tdee) {
-      onUpdate(dayData.id, { ...dayData, tdee: Number(tdee) });
-    }
-  };
-
-  const handleDateChange = (e) => {
-    const newDate = e.target.value;
-    setDateStr(newDate);
-    onUpdate(dayData.id, { ...dayData, date: newDate });
-  };
-
-  const addFood = () => {
-    const newFood = { id: crypto.randomUUID(), name: '', kcal: 0 };
-    onUpdate(dayData.id, { ...dayData, foods: [...dayData.foods, newFood] });
-  };
-
-  const updateFood = (updatedFood) => {
-    const newFoods = dayData.foods.map(f => f.id === updatedFood.id ? updatedFood : f);
-    onUpdate(dayData.id, { ...dayData, foods: newFoods });
-  };
-
-  const removeFood = (foodId) => {
-    const newFoods = dayData.foods.filter(f => f.id !== foodId);
-    onUpdate(dayData.id, { ...dayData, foods: newFoods });
-  };
-
-  // การคำนวณสรุปผลในแต่ละวัน
-  const totalKcal = dayData.foods.reduce((sum, food) => sum + (Number(food.kcal) || 0), 0);
-  const balance = dayData.tdee - totalKcal;
-  const isDeficit = balance > 0;
-
-  return (
-    <div className="bg-white rounded-3xl p-5 mb-4 shadow-sm border border-gray-100">
-      {/* Header ของวัน */}
-      <div className="flex justify-between items-center mb-4 pb-3 border-b border-gray-100">
-        <div className="flex items-center gap-2 flex-1">
-          <div className="bg-blue-100 text-blue-600 p-2 rounded-xl">
-            <CalendarIcon size={18} />
-          </div>
-          <input 
-            type="date" 
-            value={dateStr}
-            onChange={handleDateChange}
-            className="font-semibold text-gray-800 bg-transparent outline-none cursor-pointer hover:bg-gray-50 p-1 rounded-md"
-          />
-        </div>
-        <button onClick={() => onDelete(dayData.id)} className="text-gray-400 hover:text-red-500 p-1">
-          <Trash2 size={18} />
-        </button>
-      </div>
-
-      {/* Input TDEE */}
-      <div className="flex items-center justify-between mb-4 bg-orange-50 p-3 rounded-2xl">
-        <div className="flex items-center gap-2 text-orange-600">
-          <Flame size={18} />
-          <span className="text-sm font-medium">TDEE (Calories Burned)</span>
-        </div>
-        <input
-          type="number"
-          value={tdee}
-          onChange={(e) => setTdee(e.target.value)}
-          onBlur={handleTdeeBlur}
-          className="w-20 text-right bg-white rounded-lg px-2 py-1 text-sm font-semibold text-orange-700 outline-none border border-orange-200"
-        />
-      </div>
-
-      {/* รายการอาหาร */}
-      <div className="mb-4">
-        <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center gap-2 text-gray-600">
-            <Utensils size={16} />
-            <span className="text-sm font-medium">Calories Consumed (Food)</span>
-          </div>
-        </div>
-        
-        {dayData.foods.map(food => (
-          <FoodItem key={food.id} food={food} onUpdate={updateFood} onRemove={() => removeFood(food.id)} />
-        ))}
-
-        <button 
-          onClick={addFood}
-          className="w-full mt-2 py-2 flex items-center justify-center gap-1 text-sm text-blue-500 bg-blue-50 hover:bg-blue-100 rounded-xl transition-colors font-medium"
-        >
-          <Plus size={16} /> Add Food Item
-        </button>
-      </div>
-
-      {/* สรุปผลรายวัน */}
-      <div className="bg-gray-50 rounded-2xl p-4 mt-2">
-        <div className="flex justify-between text-sm mb-1 text-gray-600">
-          <span>Total Consumed:</span>
-          <span className="font-semibold">{totalKcal} kcal</span>
-        </div>
-        <div className="flex justify-between text-sm items-center border-t border-gray-200 mt-2 pt-2">
-          <span className="text-gray-600">Calorie Balance (TDEE - Food):</span>
-          <span className={`font-bold text-lg ${balance === 0 ? 'text-gray-600' : isDeficit ? 'text-green-500' : 'text-red-500'}`}>
-            {balance > 0 ? '+' : ''}{balance} kcal
-          </span>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// --- Main App Component ---
-export default function App() {
-  const [user, setUser] = useState(null);
-  const [days, setDays] = useState([]);
-  
-  // States สำหรับปฏิทิน
-  const [currentMonth, setCurrentMonth] = useState(new Date().toISOString().slice(0, 7)); // รูปแบบ YYYY-MM
-  const [selectedMonthsHistory, setSelectedMonthsHistory] = useState([new Date().toISOString().slice(0, 7)]);
-  const [isMonthPickerOpen, setIsMonthPickerOpen] = useState(false);
-  const [pickerYear, setPickerYear] = useState(new Date().getFullYear());
-  
-  const [activeTab, setActiveTab] = useState('days'); // 'days' | 'summary'
-  const [isLoading, setIsLoading] = useState(true);
-
-  // ใหม่: State สำหรับสถานะ Online และการขยายดูวันเก่า
-  const [isOnline, setIsOnline] = useState(navigator.onLine);
-  const [isOlderExpanded, setIsOlderExpanded] = useState(false);
-
-  // ชื่อย่อเดือนภาษาอังกฤษ
-  const englishShortMonths = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-
-  // 1. จัดการ Authentication First
-  useEffect(() => {
-    const initAuth = async () => {
-      try {
-        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-          await signInWithCustomToken(auth, __initial_auth_token);
-        } else {
-          await signInAnonymously(auth);
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Diet Tracker</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Babel for compiling JSX directly in the browser -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <style>
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
         }
-      } catch (error) {
-        console.error("Auth error:", error);
-      }
-    };
-    initAuth();
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+</head>
+<body class="bg-[#F2F2F7]">
+    <!-- จุดที่แอปพลิเคชันจะแสดงผล -->
+    <div id="root"></div>
 
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
-      if (!currentUser) setIsLoading(false);
-    });
-    return () => unsubscribe();
-  }, []);
-
-  // จัดการสถานะ Network Online/Offline
-  useEffect(() => {
-    const handleOnline = () => setIsOnline(true);
-    const handleOffline = () => setIsOnline(false);
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-    return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
-    };
-  }, []);
-
-  // รีเซ็ตการแสดงผลเมื่อเปลี่ยนเดือน
-  useEffect(() => {
-    setIsOlderExpanded(false);
-  }, [currentMonth]);
-
-  // 2. ดึงข้อมูลจาก Firestore เมื่อ User Login แล้ว
-  useEffect(() => {
-    if (!user) return;
-
-    // กฎสำคัญ: ใช้ Path แบบ Strict -> /artifacts/{appId}/users/{userId}/{collectionName}
-    const daysRef = collection(db, 'artifacts', globalAppId, 'users', user.uid, 'diet_days');
-    
-    // กฎสำคัญ: ห้ามใช้ query ซับซ้อน ให้ดึงทั้งหมดแล้วกรองใน Memory
-    const unsubscribe = onSnapshot(daysRef, (snapshot) => {
-      const fetchedDays = [];
-      snapshot.forEach((docSnap) => {
-        fetchedDays.push({ id: docSnap.id, ...docSnap.data() });
-      });
-      // เรียงวันที่จากใหม่ไปเก่า
-      fetchedDays.sort((a, b) => new Date(b.date) - new Date(a.date));
-      setDays(fetchedDays);
-      setIsLoading(false);
-    }, (error) => {
-      console.error("Firestore error:", error);
-      setIsLoading(false);
-    });
-
-    return () => unsubscribe();
-  }, [user]);
-
-  // --- Logic & Helpers ---
-
-  // กรองข้อมูลเฉพาะเดือนที่เลือก
-  const currentMonthDays = useMemo(() => {
-    return days.filter(d => d.date.startsWith(currentMonth));
-  }, [days, currentMonth]);
-
-  // เปลี่ยนเดือนจากประวัติ
-  const selectHistoryMonth = (monthStr) => {
-    setCurrentMonth(monthStr);
-  };
-
-  // เลือกเดือนจาก Picker
-  const handleSelectMonthFromPicker = (monthIndex) => {
-    const newMonthStr = `${pickerYear}-${String(monthIndex + 1).padStart(2, '0')}`;
-    setCurrentMonth(newMonthStr);
-    
-    // เพิ่มเข้าประวัติถ้ายังไม่มี
-    if (!selectedMonthsHistory.includes(newMonthStr)) {
-      setSelectedMonthsHistory(prev => [...prev, newMonthStr].sort().reverse());
-    }
-    
-    setIsMonthPickerOpen(false);
-  };
-
-  const getMonthName = (yearMonthStr) => {
-    const [year, month] = yearMonthStr.split('-');
-    const date = new Date(year, month - 1, 1);
-    return date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-  };
-  
-  const getShortMonthName = (yearMonthStr) => {
-    const [year, month] = yearMonthStr.split('-');
-    const date = new Date(year, month - 1, 1);
-    return `${date.toLocaleDateString('en-US', { month: 'short' })} ${date.getFullYear()}`;
-  };
-
-  // การจัดการข้อมูล Firestore
-  const handleAddDay = async () => {
-    if (!user) return;
-    
-    let newDateStr;
-    const [yearStr, monthStr] = currentMonth.split('-');
-    const year = parseInt(yearStr);
-    const month = parseInt(monthStr) - 1;
-
-    // ระบบรันวันถัดไปอัตโนมัติ
-    if (currentMonthDays.length === 0) {
-      // ถ้ายังไม่มีวันเลยในเดือนนี้ ให้เริ่มที่วันที่ 1
-      newDateStr = `${yearStr}-${monthStr}-01`;
-    } else {
-      // หาวันที่มากล่าสุด แล้วบวกเพิ่ม 1 วัน
-      const datesInMonth = currentMonthDays.map(d => parseInt(d.date.split('-')[2]));
-      const maxDate = Math.max(...datesInMonth);
-      const daysInMonth = new Date(year, month + 1, 0).getDate();
-      
-      let nextDateNum = maxDate + 1;
-      // ถ้าวันถัดไปเกินวันสิ้นเดือน ให้ใช้วันสิ้นเดือนแทน
-      if (nextDateNum > daysInMonth) {
-        nextDateNum = daysInMonth;
-      }
-      
-      newDateStr = `${yearStr}-${monthStr}-${String(nextDateNum).padStart(2, '0')}`;
-    }
-
-    // สร้างเอกสารใหม่
-    const newDocRef = doc(collection(db, 'artifacts', globalAppId, 'users', user.uid, 'diet_days'));
-    const newDay = {
-      date: newDateStr,
-      tdee: 2000, // ค่าเริ่มต้น
-      foods: [],
-      createdAt: new Date().toISOString()
-    };
-
-    await setDoc(newDocRef, newDay);
-  };
-
-  const handleUpdateDay = async (dayId, updatedData) => {
-    if (!user) return;
-    const docRef = doc(db, 'artifacts', globalAppId, 'users', user.uid, 'diet_days', dayId);
-    await setDoc(docRef, updatedData, { merge: true });
-  };
-
-  const handleDeleteDay = async (dayId) => {
-    if (!user) return;
-    const docRef = doc(db, 'artifacts', globalAppId, 'users', user.uid, 'diet_days', dayId);
-    await deleteDoc(docRef);
-  };
-
-  // --- คำนวณสรุปผล (Summaries) ---
-  const calculateSummary = (dataArray) => {
-    let totalTDEE = 0;
-    let totalKcal = 0;
-    
-    dataArray.forEach(d => {
-      totalTDEE += Number(d.tdee) || 0;
-      d.foods.forEach(f => {
-        totalKcal += Number(f.kcal) || 0;
-      });
-    });
-
-    return { totalTDEE, totalKcal, balance: totalTDEE - totalKcal };
-  };
-
-  const monthlySummary = calculateSummary(currentMonthDays);
-  const overallSummary = calculateSummary(days);
-
-  // --- Render UI ---
-  if (isLoading) {
-    return (
-      <div className="flex h-screen w-full items-center justify-center bg-[#F2F2F7]">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="min-h-screen bg-[#F2F2F7] font-sans pb-24 md:max-w-md md:mx-auto md:shadow-2xl md:min-h-[800px] md:rounded-[3rem] md:my-8 overflow-hidden relative border border-gray-200">
-      
-      {/* Month Picker Modal (Dark Theme like the screenshot) */}
-      {isMonthPickerOpen && (
-        <div className="absolute inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-[#2D2D2D] w-full max-w-[320px] rounded-2xl shadow-2xl overflow-hidden text-gray-200">
-            {/* Modal Header */}
-            <div className="p-4 border-b border-white/10 flex justify-between items-center">
-              <span className="font-medium text-white">{getMonthName(currentMonth)}</span>
-              <button onClick={() => setIsMonthPickerOpen(false)} className="bg-white/10 p-1.5 rounded-lg hover:bg-white/20">
-                <X size={16} />
-              </button>
-            </div>
-            
-            <div className="p-4">
-              {/* Year Selector */}
-              <div className="flex items-center justify-between bg-white/5 rounded-xl p-3 mb-6">
-                <span className="font-semibold text-lg">{pickerYear}</span>
-                <div className="flex gap-2">
-                  <button onClick={() => setPickerYear(p => p + 1)} className="p-1 hover:bg-white/10 rounded">
-                    <ChevronUp size={20} />
-                  </button>
-                  <button onClick={() => setPickerYear(p => p - 1)} className="p-1 hover:bg-white/10 rounded">
-                    <ChevronDown size={20} />
-                  </button>
-                </div>
-              </div>
-
-              {/* Month Grid */}
-              <div className="grid grid-cols-4 gap-y-6 gap-x-2">
-                {englishShortMonths.map((m, index) => {
-                  const isCurrentSelected = currentMonth === `${pickerYear}-${String(index + 1).padStart(2, '0')}`;
-                  return (
-                    <button
-                      key={index}
-                      onClick={() => handleSelectMonthFromPicker(index)}
-                      className={`flex justify-center items-center h-12 rounded-full font-medium transition-colors text-sm
-                        ${isCurrentSelected 
-                          ? 'bg-[#33B5E5] text-white shadow-lg shadow-[#33B5E5]/30' 
-                          : 'hover:bg-white/10 text-gray-300'}`}
-                    >
-                      {m}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Top Navigation / Month Selector */}
-      <div className="bg-white pt-10 pb-3 px-4 shadow-sm sticky top-0 z-10 rounded-b-3xl">
-        <div className="flex justify-between items-center mb-4 px-2">
-          <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Diet Tracker</h1>
-            {/* Status Icon */}
-            <div className={`flex items-center gap-1 text-[10px] px-2 py-1 rounded-full font-medium transition-colors ${isOnline ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'}`}>
-              {isOnline ? <Wifi size={12} /> : <WifiOff size={12} />}
-              <span>{isOnline ? 'Online' : 'Offline'}</span>
-            </div>
-          </div>
-        </div>
+    <!-- โค้ด React จะทำงานในส่วนนี้ -->
+    <script type="text/babel" data-type="module">
+        import React, { useState, useEffect, useMemo } from 'https://esm.sh/react@18.2.0';
+        import { createRoot } from 'https://esm.sh/react-dom@18.2.0/client';
+        import { Calendar as CalendarIcon, PieChart, Plus, Trash2, ChevronLeft, ChevronRight, Activity, Utensils, Flame, ChevronUp, ChevronDown, X, Wifi, WifiOff } from 'https://esm.sh/lucide-react@0.344.0';
         
-        {/* Main Month Dropdown Button */}
-        <button 
-          onClick={() => {
-            setPickerYear(parseInt(currentMonth.split('-')[0]));
-            setIsMonthPickerOpen(true);
-          }}
-          className="w-full flex items-center justify-between bg-gray-50 hover:bg-gray-100 rounded-2xl p-3 px-4 border border-gray-100 transition-colors"
-        >
-          <span className="font-semibold text-gray-800 text-lg">
-            {getMonthName(currentMonth)}
-          </span>
-          <ChevronDown size={20} className="text-gray-500" />
-        </button>
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js';
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
+        import { getFirestore, collection, onSnapshot, doc, setDoc, deleteDoc } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 
-        {/* Selected Months History Tabs */}
-        {selectedMonthsHistory.length > 1 && (
-          <div className="flex gap-2 mt-3 overflow-x-auto pb-1 no-scrollbar px-1">
-            {selectedMonthsHistory.map(monthStr => (
-              <button
-                key={monthStr}
-                onClick={() => selectHistoryMonth(monthStr)}
-                className={`whitespace-nowrap px-4 py-1.5 rounded-full text-xs font-medium transition-colors border
-                  ${currentMonth === monthStr 
-                    ? 'bg-blue-50 border-blue-200 text-blue-600' 
-                    : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'}`}
-              >
-                {getShortMonthName(monthStr)}
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
+        // --- Firebase Initialization ---
+        const providedConfig = {
+          apiKey: "AIzaSyBKFHNinm5U7KtwBWAATrDgmjcCdDYlePQ",
+          authDomain: "calorie-calculator-8e43a.firebaseapp.com",
+          projectId: "calorie-calculator-8e43a",
+          storageBucket: "calorie-calculator-8e43a.firebasestorage.app",
+          messagingSenderId: "189331388163",
+          appId: "1:189331388163:web:3000a88193c7bf91ea9b36"
+        };
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : providedConfig;
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        const globalAppId = typeof __app_id !== 'undefined' ? __app_id : 'calorie-calculator-8e43a';
 
-      {/* Main Content Area */}
-      <div className="p-4 h-full overflow-y-auto">
-        
-        {activeTab === 'days' && (
-          <div className="animate-in fade-in slide-in-from-bottom-4 duration-300">
-            
-            <button 
-              onClick={handleAddDay}
-              className="w-full mb-6 bg-blue-500 hover:bg-blue-600 text-white font-semibold py-4 rounded-2xl shadow-sm shadow-blue-200 flex items-center justify-center gap-2 transition-transform active:scale-95"
-            >
-              <Plus size={20} /> Add Day ({getMonthName(currentMonth)})
-            </button>
+        // --- Subcomponents ---
 
-            {currentMonthDays.length === 0 ? (
-              <div className="text-center py-12 text-gray-400">
-                <CalendarIcon size={48} className="mx-auto mb-4 opacity-20" />
-                <p>No records for this month</p>
-                <p className="text-sm mt-1">Click the button above to get started!</p>
-              </div>
-            ) : (
-              <>
-                {/* วันที่ล่าสุด (แสดงเสมอ) */}
-                <DayCard 
-                  key={currentMonthDays[0].id} 
-                  dayData={currentMonthDays[0]} 
-                  onUpdate={handleUpdateDay} 
-                  onDelete={handleDeleteDay} 
+        const FoodItem = ({ food, onUpdate, onRemove }) => {
+          const [name, setName] = useState(food.name);
+          const [kcal, setKcal] = useState(food.kcal);
+
+          const handleBlur = () => {
+            if (name !== food.name || Number(kcal) !== food.kcal) {
+              onUpdate({ ...food, name, kcal: Number(kcal) });
+            }
+          };
+
+          return (
+            <div className="flex items-center gap-2 mb-2 bg-gray-50 p-2 rounded-xl border border-gray-100">
+              <div className="flex-1">
+                <input
+                  type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  onBlur={handleBlur}
+                  placeholder="Food name (e.g., Chicken Breast)"
+                  className="w-full bg-transparent text-sm outline-none text-gray-800 placeholder-gray-400"
                 />
+              </div>
+              <div className="w-20">
+                <div className="flex items-center bg-white rounded-lg px-2 py-1 shadow-sm border border-gray-200">
+                  <input
+                    type="number"
+                    value={kcal}
+                    onChange={(e) => setKcal(e.target.value)}
+                    onBlur={handleBlur}
+                    placeholder="Kcal"
+                    className="w-full bg-transparent text-sm text-right outline-none text-gray-800"
+                  />
+                </div>
+              </div>
+              <button onClick={onRemove} className="p-2 text-red-400 hover:text-red-600 transition-colors">
+                <Trash2 size={16} />
+              </button>
+            </div>
+          );
+        };
 
-                {/* วันก่อนหน้า (ถูกซ่อนไว้ในปุ่ม) */}
-                {currentMonthDays.length > 1 && (
-                  <div className="mt-6 mb-4">
-                    <button
-                      onClick={() => setIsOlderExpanded(!isOlderExpanded)}
-                      className="w-full flex items-center justify-center gap-2 bg-gray-200/50 hover:bg-gray-200 text-gray-600 font-medium py-3 rounded-2xl transition-colors text-sm"
-                    >
-                      Previous records this month ({currentMonthDays.length - 1} days)
-                      {isOlderExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                    </button>
+        const DayCard = ({ dayData, onUpdate, onDelete }) => {
+          const [tdee, setTdee] = useState(dayData.tdee);
+          const [dateStr, setDateStr] = useState(dayData.date);
 
-                    {isOlderExpanded && (
-                      <div className="mt-4 space-y-4 animate-in fade-in slide-in-from-top-4 duration-300">
-                        {currentMonthDays.slice(1).map(day => (
-                          <DayCard 
-                            key={day.id} 
-                            dayData={day} 
-                            onUpdate={handleUpdateDay} 
-                            onDelete={handleDeleteDay} 
-                          />
-                        ))}
-                      </div>
-                    )}
+          const handleTdeeBlur = () => {
+            if (Number(tdee) !== dayData.tdee) {
+              onUpdate(dayData.id, { ...dayData, tdee: Number(tdee) });
+            }
+          };
+
+          const handleDateChange = (e) => {
+            const newDate = e.target.value;
+            setDateStr(newDate);
+            onUpdate(dayData.id, { ...dayData, date: newDate });
+          };
+
+          const addFood = () => {
+            const newFood = { id: crypto.randomUUID(), name: '', kcal: 0 };
+            onUpdate(dayData.id, { ...dayData, foods: [...dayData.foods, newFood] });
+          };
+
+          const updateFood = (updatedFood) => {
+            const newFoods = dayData.foods.map(f => f.id === updatedFood.id ? updatedFood : f);
+            onUpdate(dayData.id, { ...dayData, foods: newFoods });
+          };
+
+          const removeFood = (foodId) => {
+            const newFoods = dayData.foods.filter(f => f.id !== foodId);
+            onUpdate(dayData.id, { ...dayData, foods: newFoods });
+          };
+
+          const totalKcal = dayData.foods.reduce((sum, food) => sum + (Number(food.kcal) || 0), 0);
+          const balance = dayData.tdee - totalKcal;
+          const isDeficit = balance > 0;
+
+          return (
+            <div className="bg-white rounded-3xl p-5 mb-4 shadow-sm border border-gray-100">
+              <div className="flex justify-between items-center mb-4 pb-3 border-b border-gray-100">
+                <div className="flex items-center gap-2 flex-1">
+                  <div className="bg-blue-100 text-blue-600 p-2 rounded-xl">
+                    <CalendarIcon size={18} />
                   </div>
-                )}
-              </>
-            )}
-          </div>
-        )}
+                  <input 
+                    type="date" 
+                    value={dateStr}
+                    onChange={handleDateChange}
+                    className="font-semibold text-gray-800 bg-transparent outline-none cursor-pointer hover:bg-gray-50 p-1 rounded-md"
+                  />
+                </div>
+                <button onClick={() => onDelete(dayData.id)} className="text-gray-400 hover:text-red-500 p-1">
+                  <Trash2 size={18} />
+                </button>
+              </div>
 
-        {activeTab === 'summary' && (
-          <div className="animate-in fade-in slide-in-from-bottom-4 duration-300 space-y-6">
-            
-            {/* สรุปรายเดือน */}
-            <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100">
-              <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
-                <PieChart size={20} className="text-blue-500"/> Monthly Summary: {getMonthName(currentMonth)}
-              </h2>
-              <div className="space-y-4">
-                <div className="flex justify-between items-center p-3 bg-orange-50 rounded-2xl">
-                  <span className="text-orange-700 font-medium">Total TDEE</span>
-                  <span className="font-bold text-orange-700">{monthlySummary.totalTDEE.toLocaleString()} kcal</span>
+              <div className="flex items-center justify-between mb-4 bg-orange-50 p-3 rounded-2xl">
+                <div className="flex items-center gap-2 text-orange-600">
+                  <Flame size={18} />
+                  <span className="text-sm font-medium">TDEE (Calories Burned)</span>
                 </div>
-                <div className="flex justify-between items-center p-3 bg-gray-50 rounded-2xl">
-                  <span className="text-gray-700 font-medium">Total Consumed</span>
-                  <span className="font-bold text-gray-700">{monthlySummary.totalKcal.toLocaleString()} kcal</span>
+                <input
+                  type="number"
+                  value={tdee}
+                  onChange={(e) => setTdee(e.target.value)}
+                  onBlur={handleTdeeBlur}
+                  className="w-20 text-right bg-white rounded-lg px-2 py-1 text-sm font-semibold text-orange-700 outline-none border border-orange-200"
+                />
+              </div>
+
+              <div className="mb-4">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2 text-gray-600">
+                    <Utensils size={16} />
+                    <span className="text-sm font-medium">Calories Consumed (Food)</span>
+                  </div>
                 </div>
-                <div className="flex justify-between items-center p-4 bg-blue-50 rounded-2xl border border-blue-100">
-                  <span className="text-blue-800 font-semibold">Energy Balance</span>
-                  <span className={`font-bold text-xl ${monthlySummary.balance > 0 ? 'text-green-600' : 'text-red-500'}`}>
-                    {monthlySummary.balance > 0 ? '+' : ''}{monthlySummary.balance.toLocaleString()} kcal
+                
+                {dayData.foods.map(food => (
+                  <FoodItem key={food.id} food={food} onUpdate={updateFood} onRemove={() => removeFood(food.id)} />
+                ))}
+
+                <button 
+                  onClick={addFood}
+                  className="w-full mt-2 py-2 flex items-center justify-center gap-1 text-sm text-blue-500 bg-blue-50 hover:bg-blue-100 rounded-xl transition-colors font-medium"
+                >
+                  <Plus size={16} /> Add Food Item
+                </button>
+              </div>
+
+              <div className="bg-gray-50 rounded-2xl p-4 mt-2">
+                <div className="flex justify-between text-sm mb-1 text-gray-600">
+                  <span>Total Consumed:</span>
+                  <span className="font-semibold">{totalKcal} kcal</span>
+                </div>
+                <div className="flex justify-between text-sm items-center border-t border-gray-200 mt-2 pt-2">
+                  <span className="text-gray-600">Calorie Balance:</span>
+                  <span className={`font-bold text-lg ${balance === 0 ? 'text-gray-600' : isDeficit ? 'text-green-500' : 'text-red-500'}`}>
+                    {balance > 0 ? '+' : ''}{balance} kcal
                   </span>
                 </div>
               </div>
             </div>
+          );
+        };
 
-            {/* สรุปรวมทั้งหมด */}
-            <div className="bg-gradient-to-br from-blue-500 to-indigo-600 rounded-3xl p-6 shadow-md text-white">
-              <h2 className="text-lg font-bold mb-4 flex items-center gap-2 opacity-90">
-                <Activity size={20} /> All-time Calorie Overview
-              </h2>
-              <div className="grid grid-cols-2 gap-4 mb-4">
-                <div className="bg-white/10 rounded-2xl p-4 backdrop-blur-sm">
-                  <div className="text-sm opacity-80 mb-1">Total TDEE</div>
-                  <div className="font-bold text-xl">{overallSummary.totalTDEE.toLocaleString()}</div>
-                </div>
-                <div className="bg-white/10 rounded-2xl p-4 backdrop-blur-sm">
-                  <div className="text-sm opacity-80 mb-1">Total Consumed</div>
-                  <div className="font-bold text-xl">{overallSummary.totalKcal.toLocaleString()}</div>
-                </div>
-              </div>
-              <div className="bg-white/20 rounded-2xl p-4 backdrop-blur-sm flex justify-between items-center">
-                <span className="font-medium">Net Calorie Balance</span>
-                <span className="font-bold text-2xl">
-                  {overallSummary.balance > 0 ? '+' : ''}{overallSummary.balance.toLocaleString()}
-                </span>
-              </div>
-              <p className="text-xs text-center mt-3 opacity-70">
-                *Positive (+) means you burned more than you ate (Calorie Deficit)
-              </p>
-            </div>
-
-          </div>
-        )}
-      </div>
-
-      {/* Bottom Tab Bar (iOS Style Glassmorphism) */}
-      <div className="absolute bottom-0 w-full bg-white/80 backdrop-blur-md border-t border-gray-200 px-6 py-4 pb-8 md:pb-6 rounded-b-[3rem]">
-        <div className="flex justify-around items-center">
-          <button 
-            onClick={() => setActiveTab('days')}
-            className={`flex flex-col items-center gap-1 transition-colors ${activeTab === 'days' ? 'text-blue-500' : 'text-gray-400'}`}
-          >
-            <CalendarIcon size={24} className={activeTab === 'days' ? 'fill-blue-50' : ''} />
-            <span className="text-[10px] font-medium">Calendar</span>
-          </button>
+        // --- Main App Component ---
+        function App() {
+          const [user, setUser] = useState(null);
+          const [days, setDays] = useState([]);
           
-          <button 
-            onClick={() => setActiveTab('summary')}
-            className={`flex flex-col items-center gap-1 transition-colors ${activeTab === 'summary' ? 'text-blue-500' : 'text-gray-400'}`}
-          >
-            <PieChart size={24} className={activeTab === 'summary' ? 'fill-blue-50' : ''} />
-            <span className="text-[10px] font-medium">Summary</span>
-          </button>
-        </div>
-      </div>
+          const [currentMonth, setCurrentMonth] = useState(new Date().toISOString().slice(0, 7));
+          const [selectedMonthsHistory, setSelectedMonthsHistory] = useState([new Date().toISOString().slice(0, 7)]);
+          const [isMonthPickerOpen, setIsMonthPickerOpen] = useState(false);
+          const [pickerYear, setPickerYear] = useState(new Date().getFullYear());
+          
+          const [activeTab, setActiveTab] = useState('days');
+          const [isLoading, setIsLoading] = useState(true);
 
-    </div>
-  );
-}
+          const [isOnline, setIsOnline] = useState(navigator.onLine);
+          const [isOlderExpanded, setIsOlderExpanded] = useState(false);
+
+          const englishShortMonths = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+          useEffect(() => {
+            const initAuth = async () => {
+              try {
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                  await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                  await signInAnonymously(auth);
+                }
+              } catch (error) {
+                console.error("Auth error:", error);
+              }
+            };
+            initAuth();
+
+            const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+              setUser(currentUser);
+              if (!currentUser) setIsLoading(false);
+            });
+            return () => unsubscribe();
+          }, []);
+
+          useEffect(() => {
+            const handleOnline = () => setIsOnline(true);
+            const handleOffline = () => setIsOnline(false);
+            window.addEventListener('online', handleOnline);
+            window.addEventListener('offline', handleOffline);
+            return () => {
+              window.removeEventListener('online', handleOnline);
+              window.removeEventListener('offline', handleOffline);
+            };
+          }, []);
+
+          useEffect(() => {
+            setIsOlderExpanded(false);
+          }, [currentMonth]);
+
+          useEffect(() => {
+            if (!user) return;
+
+            const daysRef = collection(db, 'artifacts', globalAppId, 'users', user.uid, 'diet_days');
+            
+            const unsubscribe = onSnapshot(daysRef, (snapshot) => {
+              const fetchedDays = [];
+              snapshot.forEach((docSnap) => {
+                fetchedDays.push({ id: docSnap.id, ...docSnap.data() });
+              });
+              fetchedDays.sort((a, b) => new Date(b.date) - new Date(a.date));
+              setDays(fetchedDays);
+              setIsLoading(false);
+            }, (error) => {
+              console.error("Firestore error:", error);
+              setIsLoading(false);
+            });
+
+            return () => unsubscribe();
+          }, [user]);
+
+          const currentMonthDays = useMemo(() => {
+            return days.filter(d => d.date.startsWith(currentMonth));
+          }, [days, currentMonth]);
+
+          const selectHistoryMonth = (monthStr) => {
+            setCurrentMonth(monthStr);
+          };
+
+          const handleSelectMonthFromPicker = (monthIndex) => {
+            const newMonthStr = `${pickerYear}-${String(monthIndex + 1).padStart(2, '0')}`;
+            setCurrentMonth(newMonthStr);
+            
+            if (!selectedMonthsHistory.includes(newMonthStr)) {
+              setSelectedMonthsHistory(prev => [...prev, newMonthStr].sort().reverse());
+            }
+            
+            setIsMonthPickerOpen(false);
+          };
+
+          const getMonthName = (yearMonthStr) => {
+            const [year, month] = yearMonthStr.split('-');
+            const date = new Date(year, month - 1, 1);
+            return date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+          };
+          
+          const getShortMonthName = (yearMonthStr) => {
+            const [year, month] = yearMonthStr.split('-');
+            const date = new Date(year, month - 1, 1);
+            return `${date.toLocaleDateString('en-US', { month: 'short' })} ${date.getFullYear()}`;
+          };
+
+          const handleAddDay = async () => {
+            if (!user) return;
+            
+            let newDateStr;
+            const [yearStr, monthStr] = currentMonth.split('-');
+            const year = parseInt(yearStr);
+            const month = parseInt(monthStr) - 1;
+
+            if (currentMonthDays.length === 0) {
+              newDateStr = `${yearStr}-${monthStr}-01`;
+            } else {
+              const datesInMonth = currentMonthDays.map(d => parseInt(d.date.split('-')[2]));
+              const maxDate = Math.max(...datesInMonth);
+              const daysInMonth = new Date(year, month + 1, 0).getDate();
+              
+              let nextDateNum = maxDate + 1;
+              if (nextDateNum > daysInMonth) {
+                nextDateNum = daysInMonth;
+              }
+              
+              newDateStr = `${yearStr}-${monthStr}-${String(nextDateNum).padStart(2, '0')}`;
+            }
+
+            const newDocRef = doc(collection(db, 'artifacts', globalAppId, 'users', user.uid, 'diet_days'));
+            const newDay = {
+              date: newDateStr,
+              tdee: 2000,
+              foods: [],
+              createdAt: new Date().toISOString()
+            };
+
+            await setDoc(newDocRef, newDay);
+          };
+
+          const handleUpdateDay = async (dayId, updatedData) => {
+            if (!user) return;
+            const docRef = doc(db, 'artifacts', globalAppId, 'users', user.uid, 'diet_days', dayId);
+            await setDoc(docRef, updatedData, { merge: true });
+          };
+
+          const handleDeleteDay = async (dayId) => {
+            if (!user) return;
+            const docRef = doc(db, 'artifacts', globalAppId, 'users', user.uid, 'diet_days', dayId);
+            await deleteDoc(docRef);
+          };
+
+          const calculateSummary = (dataArray) => {
+            let totalTDEE = 0;
+            let totalKcal = 0;
+            
+            dataArray.forEach(d => {
+              totalTDEE += Number(d.tdee) || 0;
+              d.foods.forEach(f => {
+                totalKcal += Number(f.kcal) || 0;
+              });
+            });
+
+            return { totalTDEE, totalKcal, balance: totalTDEE - totalKcal };
+          };
+
+          const monthlySummary = calculateSummary(currentMonthDays);
+          const overallSummary = calculateSummary(days);
+
+          if (isLoading) {
+            return (
+              <div className="flex h-screen w-full items-center justify-center bg-[#F2F2F7]">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+              </div>
+            );
+          }
+
+          return (
+            <div className="min-h-screen bg-[#F2F2F7] font-sans pb-24 md:max-w-md md:mx-auto md:shadow-2xl md:min-h-[800px] md:rounded-[3rem] md:my-8 overflow-hidden relative border border-gray-200">
+              
+              {isMonthPickerOpen && (
+                <div className="absolute inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-in fade-in duration-200">
+                  <div className="bg-[#2D2D2D] w-full max-w-[320px] rounded-2xl shadow-2xl overflow-hidden text-gray-200">
+                    <div className="p-4 border-b border-white/10 flex justify-between items-center">
+                      <span className="font-medium text-white">{getMonthName(currentMonth)}</span>
+                      <button onClick={() => setIsMonthPickerOpen(false)} className="bg-white/10 p-1.5 rounded-lg hover:bg-white/20">
+                        <X size={16} />
+                      </button>
+                    </div>
+                    
+                    <div className="p-4">
+                      <div className="flex items-center justify-between bg-white/5 rounded-xl p-3 mb-6">
+                        <span className="font-semibold text-lg">{pickerYear}</span>
+                        <div className="flex gap-2">
+                          <button onClick={() => setPickerYear(p => p + 1)} className="p-1 hover:bg-white/10 rounded">
+                            <ChevronUp size={20} />
+                          </button>
+                          <button onClick={() => setPickerYear(p => p - 1)} className="p-1 hover:bg-white/10 rounded">
+                            <ChevronDown size={20} />
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-4 gap-y-6 gap-x-2">
+                        {englishShortMonths.map((m, index) => {
+                          const isCurrentSelected = currentMonth === `${pickerYear}-${String(index + 1).padStart(2, '0')}`;
+                          return (
+                            <button
+                              key={index}
+                              onClick={() => handleSelectMonthFromPicker(index)}
+                              className={`flex justify-center items-center h-12 rounded-full font-medium transition-colors text-sm
+                                ${isCurrentSelected 
+                                  ? 'bg-[#33B5E5] text-white shadow-lg shadow-[#33B5E5]/30' 
+                                  : 'hover:bg-white/10 text-gray-300'}`}
+                            >
+                              {m}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="bg-white pt-10 pb-3 px-4 shadow-sm sticky top-0 z-10 rounded-b-3xl">
+                <div className="flex justify-between items-center mb-4 px-2">
+                  <div className="flex items-center gap-3">
+                    <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Diet Tracker</h1>
+                    <div className={`flex items-center gap-1 text-[10px] px-2 py-1 rounded-full font-medium transition-colors ${isOnline ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'}`}>
+                      {isOnline ? <Wifi size={12} /> : <WifiOff size={12} />}
+                      <span>{isOnline ? 'Online' : 'Offline'}</span>
+                    </div>
+                  </div>
+                </div>
+                
+                <button 
+                  onClick={() => {
+                    setPickerYear(parseInt(currentMonth.split('-')[0]));
+                    setIsMonthPickerOpen(true);
+                  }}
+                  className="w-full flex items-center justify-between bg-gray-50 hover:bg-gray-100 rounded-2xl p-3 px-4 border border-gray-100 transition-colors"
+                >
+                  <span className="font-semibold text-gray-800 text-lg">
+                    {getMonthName(currentMonth)}
+                  </span>
+                  <ChevronDown size={20} className="text-gray-500" />
+                </button>
+
+                {selectedMonthsHistory.length > 1 && (
+                  <div className="flex gap-2 mt-3 overflow-x-auto pb-1 no-scrollbar px-1">
+                    {selectedMonthsHistory.map(monthStr => (
+                      <button
+                        key={monthStr}
+                        onClick={() => selectHistoryMonth(monthStr)}
+                        className={`whitespace-nowrap px-4 py-1.5 rounded-full text-xs font-medium transition-colors border
+                          ${currentMonth === monthStr 
+                            ? 'bg-blue-50 border-blue-200 text-blue-600' 
+                            : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'}`}
+                      >
+                        {getShortMonthName(monthStr)}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="p-4 h-full overflow-y-auto">
+                
+                {activeTab === 'days' && (
+                  <div className="animate-in fade-in slide-in-from-bottom-4 duration-300">
+                    
+                    <button 
+                      onClick={handleAddDay}
+                      className="w-full mb-6 bg-blue-500 hover:bg-blue-600 text-white font-semibold py-4 rounded-2xl shadow-sm shadow-blue-200 flex items-center justify-center gap-2 transition-transform active:scale-95"
+                    >
+                      <Plus size={20} /> Add Day ({getMonthName(currentMonth)})
+                    </button>
+
+                    {currentMonthDays.length === 0 ? (
+                      <div className="text-center py-12 text-gray-400">
+                        <CalendarIcon size={48} className="mx-auto mb-4 opacity-20" />
+                        <p>No records for this month</p>
+                        <p className="text-sm mt-1">Click the button above to get started!</p>
+                      </div>
+                    ) : (
+                      <>
+                        <DayCard 
+                          key={currentMonthDays[0].id} 
+                          dayData={currentMonthDays[0]} 
+                          onUpdate={handleUpdateDay} 
+                          onDelete={handleDeleteDay} 
+                        />
+
+                        {currentMonthDays.length > 1 && (
+                          <div className="mt-6 mb-4">
+                            <button
+                              onClick={() => setIsOlderExpanded(!isOlderExpanded)}
+                              className="w-full flex items-center justify-center gap-2 bg-gray-200/50 hover:bg-gray-200 text-gray-600 font-medium py-3 rounded-2xl transition-colors text-sm"
+                            >
+                              Previous records this month ({currentMonthDays.length - 1} days)
+                              {isOlderExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                            </button>
+
+                            {isOlderExpanded && (
+                              <div className="mt-4 space-y-4 animate-in fade-in slide-in-from-top-4 duration-300">
+                                {currentMonthDays.slice(1).map(day => (
+                                  <DayCard 
+                                    key={day.id} 
+                                    dayData={day} 
+                                    onUpdate={handleUpdateDay} 
+                                    onDelete={handleDeleteDay} 
+                                  />
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
+                )}
+
+                {activeTab === 'summary' && (
+                  <div className="animate-in fade-in slide-in-from-bottom-4 duration-300 space-y-6">
+                    
+                    <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100">
+                      <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
+                        <PieChart size={20} className="text-blue-500"/> Monthly Summary: {getMonthName(currentMonth)}
+                      </h2>
+                      <div className="space-y-4">
+                        <div className="flex justify-between items-center p-3 bg-orange-50 rounded-2xl">
+                          <span className="text-orange-700 font-medium">Total TDEE</span>
+                          <span className="font-bold text-orange-700">{monthlySummary.totalTDEE.toLocaleString()} kcal</span>
+                        </div>
+                        <div className="flex justify-between items-center p-3 bg-gray-50 rounded-2xl">
+                          <span className="text-gray-700 font-medium">Total Consumed</span>
+                          <span className="font-bold text-gray-700">{monthlySummary.totalKcal.toLocaleString()} kcal</span>
+                        </div>
+                        <div className="flex justify-between items-center p-4 bg-blue-50 rounded-2xl border border-blue-100">
+                          <span className="text-blue-800 font-semibold">Energy Balance</span>
+                          <span className={`font-bold text-xl ${monthlySummary.balance > 0 ? 'text-green-600' : 'text-red-500'}`}>
+                            {monthlySummary.balance > 0 ? '+' : ''}{monthlySummary.balance.toLocaleString()} kcal
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="bg-gradient-to-br from-blue-500 to-indigo-600 rounded-3xl p-6 shadow-md text-white">
+                      <h2 className="text-lg font-bold mb-4 flex items-center gap-2 opacity-90">
+                        <Activity size={20} /> All-time Calorie Overview
+                      </h2>
+                      <div className="grid grid-cols-2 gap-4 mb-4">
+                        <div className="bg-white/10 rounded-2xl p-4 backdrop-blur-sm">
+                          <div className="text-sm opacity-80 mb-1">Total TDEE</div>
+                          <div className="font-bold text-xl">{overallSummary.totalTDEE.toLocaleString()}</div>
+                        </div>
+                        <div className="bg-white/10 rounded-2xl p-4 backdrop-blur-sm">
+                          <div className="text-sm opacity-80 mb-1">Total Consumed</div>
+                          <div className="font-bold text-xl">{overallSummary.totalKcal.toLocaleString()}</div>
+                        </div>
+                      </div>
+                      <div className="bg-white/20 rounded-2xl p-4 backdrop-blur-sm flex justify-between items-center">
+                        <span className="font-medium">Net Calorie Balance</span>
+                        <span className="font-bold text-2xl">
+                          {overallSummary.balance > 0 ? '+' : ''}{overallSummary.balance.toLocaleString()}
+                        </span>
+                      </div>
+                      <p className="text-xs text-center mt-3 opacity-70">
+                        *Positive (+) means you burned more than you ate (Calorie Deficit)
+                      </p>
+                    </div>
+
+                  </div>
+                )}
+              </div>
+
+              <div className="absolute bottom-0 w-full bg-white/80 backdrop-blur-md border-t border-gray-200 px-6 py-4 pb-8 md:pb-6 rounded-b-[3rem]">
+                <div className="flex justify-around items-center">
+                  <button 
+                    onClick={() => setActiveTab('days')}
+                    className={`flex flex-col items-center gap-1 transition-colors ${activeTab === 'days' ? 'text-blue-500' : 'text-gray-400'}`}
+                  >
+                    <CalendarIcon size={24} className={activeTab === 'days' ? 'fill-blue-50' : ''} />
+                    <span className="text-[10px] font-medium">Calendar</span>
+                  </button>
+                  
+                  <button 
+                    onClick={() => setActiveTab('summary')}
+                    className={`flex flex-col items-center gap-1 transition-colors ${activeTab === 'summary' ? 'text-blue-500' : 'text-gray-400'}`}
+                  >
+                    <PieChart size={24} className={activeTab === 'summary' ? 'fill-blue-50' : ''} />
+                    <span className="text-[10px] font-medium">Summary</span>
+                  </button>
+                </div>
+              </div>
+
+            </div>
+          );
+        }
+
+        // --- Render into the DOM ---
+        const root = createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
