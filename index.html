@@ -340,13 +340,31 @@
             setCurrentMonth(monthStr);
           };
 
-          const handleRemoveHistoryMonth = (monthStrToRemove, e) => {
+          const handleRemoveHistoryMonth = async (monthStrToRemove, e) => {
             e.stopPropagation(); 
+            
+            // 1. ลบข้อมูลแคลอรีที่บันทึกไว้ในเดือนนี้ทั้งหมดออกจาก Database (Firestore)
+            if (user) {
+              const daysToDelete = days.filter(d => d.date.startsWith(monthStrToRemove));
+              for (const day of daysToDelete) {
+                const docRef = doc(db, 'artifacts', globalAppId, 'users', user.uid, 'diet_days', day.id);
+                await deleteDoc(docRef);
+              }
+            }
+
+            // 2. เอาแท็บออกจากหน้าจอประวัติ
             const updatedHistory = selectedMonthsHistory.filter(m => m !== monthStrToRemove);
             setSelectedMonthsHistory(updatedHistory);
             
-            if (currentMonth === monthStrToRemove && updatedHistory.length > 0) {
-              setCurrentMonth(updatedHistory[0]);
+            // 3. ถ้าลบเดือนที่กำลังเปิดดูอยู่ ให้สลับหน้าจอไปเดือนอื่นที่เหลือ หรือกลับไปเดือนปัจจุบันถ้าไม่เหลือแท็บแล้ว
+            if (currentMonth === monthStrToRemove) {
+              if (updatedHistory.length > 0) {
+                setCurrentMonth(updatedHistory[0]);
+              } else {
+                const thisMonth = new Date().toISOString().slice(0, 7);
+                setCurrentMonth(thisMonth);
+                setSelectedMonthsHistory([thisMonth]);
+              }
             }
           };
 
