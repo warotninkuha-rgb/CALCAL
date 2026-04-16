@@ -38,10 +38,18 @@
                 const ctx = canvas.getContext('2d');
                 ctx.drawImage(img, 0, 0, 512, 512);
 
+                // 1. ไอคอนสำหรับ iOS Home Screen
                 const link = document.createElement('link');
                 link.rel = 'apple-touch-icon';
                 link.href = canvas.toDataURL('image/png');
                 document.head.appendChild(link);
+
+                // 2. ไอคอนสำหรับ Browser Tab (Favicon) เพิ่มเติมตรงนี้
+                const favicon = document.createElement('link');
+                favicon.rel = 'icon';
+                favicon.type = 'image/png';
+                favicon.href = canvas.toDataURL('image/png');
+                document.head.appendChild(favicon);
             };
             img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgString);
         })();
