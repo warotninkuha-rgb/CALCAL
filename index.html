@@ -11,7 +11,7 @@
     <meta name="apple-mobile-web-app-title" content="Diet Tracker">
     <meta name="theme-color" content="#F2F2F7">
     
-    <!-- Script สร้าง iOS Icon แบบอัตโนมัติ (รูปไฟสีส้มแดง) -->
+    <!-- Script สร้าง iOS Icon และ Favicon แบบอัตโนมัติ (รูปไฟสีส้มแดง) -->
     <script>
         (function() {
             const svgString = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
@@ -38,13 +38,11 @@
                 const ctx = canvas.getContext('2d');
                 ctx.drawImage(img, 0, 0, 512, 512);
 
-                // 1. ไอคอนสำหรับ iOS Home Screen
                 const link = document.createElement('link');
                 link.rel = 'apple-touch-icon';
                 link.href = canvas.toDataURL('image/png');
                 document.head.appendChild(link);
 
-                // 2. ไอคอนสำหรับ Browser Tab (Favicon) เพิ่มเติมตรงนี้
                 const favicon = document.createElement('link');
                 favicon.rel = 'icon';
                 favicon.type = 'image/png';
@@ -262,8 +260,14 @@
           const [user, setUser] = useState(null);
           const [days, setDays] = useState([]);
           
-          const [currentMonth, setCurrentMonth] = useState(new Date().toISOString().slice(0, 7));
-          const [selectedMonthsHistory, setSelectedMonthsHistory] = useState([new Date().toISOString().slice(0, 7)]);
+          const getLocalMonthStr = () => {
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            return `${year}-${month}`;
+          };
+
+          const [currentMonth, setCurrentMonth] = useState(getLocalMonthStr());
           const [isMonthPickerOpen, setIsMonthPickerOpen] = useState(false);
           const [pickerYear, setPickerYear] = useState(new Date().getFullYear());
           
@@ -274,6 +278,12 @@
           const [isOlderExpanded, setIsOlderExpanded] = useState(false);
 
           const englishShortMonths = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+          const historyTabs = useMemo(() => {
+            const monthsFromData = days.map(d => d.date.slice(0, 7));
+            const allUniqueMonths = [...new Set([...monthsFromData, currentMonth])];
+            return allUniqueMonths.sort().reverse();
+          }, [days, currentMonth]);
 
           useEffect(() => {
             const initAuth = async () => {
@@ -336,34 +346,21 @@
             return days.filter(d => d.date.startsWith(currentMonth));
           }, [days, currentMonth]);
 
-          const selectHistoryMonth = (monthStr) => {
-            setCurrentMonth(monthStr);
-          };
-
           const handleRemoveHistoryMonth = async (monthStrToRemove, e) => {
             e.stopPropagation(); 
             
-            // 1. ลบข้อมูลแคลอรีที่บันทึกไว้ในเดือนนี้ทั้งหมดออกจาก Database (Firestore)
-            if (user) {
-              const daysToDelete = days.filter(d => d.date.startsWith(monthStrToRemove));
-              for (const day of daysToDelete) {
-                const docRef = doc(db, 'artifacts', globalAppId, 'users', user.uid, 'diet_days', day.id);
-                await deleteDoc(docRef);
+            if (window.confirm(`Are you sure you want to delete all data for ${monthStrToRemove}?`)) {
+              if (user) {
+                const daysToDelete = days.filter(d => d.date.startsWith(monthStrToRemove));
+                for (const day of daysToDelete) {
+                  const docRef = doc(db, 'artifacts', globalAppId, 'users', user.uid, 'diet_days', day.id);
+                  await deleteDoc(docRef);
+                }
               }
-            }
 
-            // 2. เอาแท็บออกจากหน้าจอประวัติ
-            const updatedHistory = selectedMonthsHistory.filter(m => m !== monthStrToRemove);
-            setSelectedMonthsHistory(updatedHistory);
-            
-            // 3. ถ้าลบเดือนที่กำลังเปิดดูอยู่ ให้สลับหน้าจอไปเดือนอื่นที่เหลือ หรือกลับไปเดือนปัจจุบันถ้าไม่เหลือแท็บแล้ว
-            if (currentMonth === monthStrToRemove) {
-              if (updatedHistory.length > 0) {
-                setCurrentMonth(updatedHistory[0]);
-              } else {
-                const thisMonth = new Date().toISOString().slice(0, 7);
-                setCurrentMonth(thisMonth);
-                setSelectedMonthsHistory([thisMonth]);
+              if (currentMonth === monthStrToRemove) {
+                const remainingMonths = historyTabs.filter(m => m !== monthStrToRemove);
+                setCurrentMonth(remainingMonths.length > 0 ? remainingMonths[0] : getLocalMonthStr());
               }
             }
           };
@@ -371,11 +368,6 @@
           const handleSelectMonthFromPicker = (monthIndex) => {
             const newMonthStr = `${pickerYear}-${String(monthIndex + 1).padStart(2, '0')}`;
             setCurrentMonth(newMonthStr);
-            
-            if (!selectedMonthsHistory.includes(newMonthStr)) {
-              setSelectedMonthsHistory(prev => [...prev, newMonthStr].sort().reverse());
-            }
-            
             setIsMonthPickerOpen(false);
           };
 
@@ -454,7 +446,6 @@
           const monthlySummary = calculateSummary(currentMonthDays);
           const overallSummary = calculateSummary(days);
 
-          // Get formatted today's date for the modal header
           const todayFormatted = new Date().toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long' });
 
           if (isLoading) {
@@ -542,12 +533,12 @@
                 </button>
 
                 {/* History Tabs */}
-                {selectedMonthsHistory.length > 1 && (
+                {historyTabs.length > 1 && (
                   <div className="flex gap-2 mt-3 overflow-x-auto pb-1 no-scrollbar px-1">
-                    {selectedMonthsHistory.map(monthStr => (
+                    {historyTabs.map(monthStr => (
                       <div
                         key={monthStr}
-                        onClick={() => selectHistoryMonth(monthStr)}
+                        onClick={() => setCurrentMonth(monthStr)}
                         className={`flex items-center gap-1 whitespace-nowrap pl-4 pr-1.5 py-1.5 rounded-full text-xs font-medium transition-colors border cursor-pointer
                           ${currentMonth === monthStr 
                             ? 'bg-blue-50 border-blue-200 text-blue-600' 
