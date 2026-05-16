@@ -5,13 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Diet Tracker</title>
     
-    <!-- PWA & iOS Home Screen Setup -->
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="Diet Tracker">
     <meta name="theme-color" content="#F2F2F7">
     
-    <!-- Script สร้าง iOS Icon และ Favicon แบบอัตโนมัติ (รูปไฟสีส้มแดง) -->
     <script>
         (function() {
             const svgString = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
@@ -29,7 +27,6 @@
                     <path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z" fill="#ffffff" />
                 </g>
             </svg>`;
-
             const img = new Image();
             img.onload = function() {
                 const canvas = document.createElement('canvas');
@@ -37,12 +34,10 @@
                 canvas.height = 512;
                 const ctx = canvas.getContext('2d');
                 ctx.drawImage(img, 0, 0, 512, 512);
-
                 const link = document.createElement('link');
                 link.rel = 'apple-touch-icon';
                 link.href = canvas.toDataURL('image/png');
                 document.head.appendChild(link);
-
                 const favicon = document.createElement('link');
                 favicon.rel = 'icon';
                 favicon.type = 'image/png';
@@ -53,13 +48,8 @@
         })();
     </script>
 
-    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    
-    <!-- Babel สำหรับแปลงโค้ด React ให้ทำงานบน Browser ได้โดยตรง -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-
-    <!-- Import Map: ชี้เป้าหมายที่อยู่ของ Library ต่างๆ -->
     <script type="importmap">
     {
         "imports": {
@@ -72,7 +62,6 @@
         }
     }
     </script>
-
     <style>
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
@@ -81,19 +70,15 @@
     </style>
 </head>
 <body class="bg-[#F2F2F7]">
-    
     <div id="root"></div>
-
     <script type="text/babel" data-type="module">
         import React, { useState, useEffect, useMemo } from 'react';
         import { createRoot } from 'react-dom/client';
-        import { Calendar as CalendarIcon, PieChart, Plus, Trash2, ChevronLeft, ChevronRight, Activity, Utensils, Flame, ChevronUp, ChevronDown, X, Wifi, WifiOff } from 'lucide-react';
-        
+        import { Calendar as CalendarIcon, PieChart, Plus, Trash2, ChevronLeft, ChevronRight, Activity, Utensils, Flame, ChevronUp, ChevronDown, X, Wifi, WifiOff, AlertCircle } from 'lucide-react';
         import { initializeApp } from 'firebase/app';
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from 'firebase/auth';
         import { getFirestore, collection, onSnapshot, doc, setDoc, deleteDoc } from 'firebase/firestore';
 
-        // --- Firebase Initialization ---
         const providedConfig = {
           apiKey: "AIzaSyBKFHNinm5U7KtwBWAATrDgmjcCdDYlePQ",
           authDomain: "calorie-calculator-8e43a.firebaseapp.com",
@@ -108,80 +93,37 @@
         const db = getFirestore(app);
         const globalAppId = typeof __app_id !== 'undefined' ? __app_id : 'calorie-calculator-8e43a';
 
-        // --- Subcomponents ---
-
+        // --- FoodItem Component ---
         const FoodItem = ({ food, onUpdate, onRemove }) => {
           const [name, setName] = useState(food.name);
           const [kcal, setKcal] = useState(food.kcal);
-
           const handleBlur = () => {
-            if (name !== food.name || Number(kcal) !== food.kcal) {
-              onUpdate({ ...food, name, kcal: Number(kcal) });
-            }
+            if (name !== food.name || Number(kcal) !== food.kcal) onUpdate({ ...food, name, kcal: Number(kcal) });
           };
-
           return (
             <div className="flex items-center gap-2 mb-2 bg-gray-50 p-2 rounded-xl border border-gray-100">
               <div className="flex-1">
-                <input
-                  type="text"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  onBlur={handleBlur}
-                  placeholder="Food name (e.g., Chicken Breast)"
-                  className="w-full bg-transparent text-sm outline-none text-gray-800 placeholder-gray-400"
-                />
+                <input type="text" value={name} onChange={(e) => setName(e.target.value)} onBlur={handleBlur} placeholder="Food name (e.g., Chicken)" className="w-full bg-transparent text-sm outline-none text-gray-800 placeholder-gray-400"/>
               </div>
               <div className="w-20">
                 <div className="flex items-center bg-white rounded-lg px-2 py-1 shadow-sm border border-gray-200">
-                  <input
-                    type="number"
-                    value={kcal}
-                    onChange={(e) => setKcal(e.target.value)}
-                    onBlur={handleBlur}
-                    placeholder="Kcal"
-                    className="w-full bg-transparent text-sm text-right outline-none text-gray-800"
-                  />
+                  <input type="number" value={kcal} onChange={(e) => setKcal(e.target.value)} onBlur={handleBlur} placeholder="Kcal" className="w-full bg-transparent text-sm text-right outline-none text-gray-800"/>
                 </div>
               </div>
-              <button onClick={onRemove} className="p-2 text-red-400 hover:text-red-600 transition-colors">
-                <Trash2 size={16} />
-              </button>
+              <button onClick={onRemove} className="p-2 text-red-400 hover:text-red-600"><Trash2 size={16} /></button>
             </div>
           );
         };
 
+        // --- DayCard Component ---
         const DayCard = ({ dayData, onUpdate, onDelete }) => {
           const [tdee, setTdee] = useState(dayData.tdee);
           const [dateStr, setDateStr] = useState(dayData.date);
-
-          const handleTdeeBlur = () => {
-            if (Number(tdee) !== dayData.tdee) {
-              onUpdate(dayData.id, { ...dayData, tdee: Number(tdee) });
-            }
-          };
-
-          const handleDateChange = (e) => {
-            const newDate = e.target.value;
-            setDateStr(newDate);
-            onUpdate(dayData.id, { ...dayData, date: newDate });
-          };
-
-          const addFood = () => {
-            const newFood = { id: crypto.randomUUID(), name: '', kcal: 0 };
-            onUpdate(dayData.id, { ...dayData, foods: [...dayData.foods, newFood] });
-          };
-
-          const updateFood = (updatedFood) => {
-            const newFoods = dayData.foods.map(f => f.id === updatedFood.id ? updatedFood : f);
-            onUpdate(dayData.id, { ...dayData, foods: newFoods });
-          };
-
-          const removeFood = (foodId) => {
-            const newFoods = dayData.foods.filter(f => f.id !== foodId);
-            onUpdate(dayData.id, { ...dayData, foods: newFoods });
-          };
-
+          const handleTdeeBlur = () => { if (Number(tdee) !== dayData.tdee) onUpdate(dayData.id, { ...dayData, tdee: Number(tdee) }); };
+          const handleDateChange = (e) => { const newDate = e.target.value; setDateStr(newDate); onUpdate(dayData.id, { ...dayData, date: newDate }); };
+          const addFood = () => onUpdate(dayData.id, { ...dayData, foods: [...dayData.foods, { id: crypto.randomUUID(), name: '', kcal: 0 }] });
+          const updateFood = (updatedFood) => onUpdate(dayData.id, { ...dayData, foods: dayData.foods.map(f => f.id === updatedFood.id ? updatedFood : f) });
+          const removeFood = (foodId) => onUpdate(dayData.id, { ...dayData, foods: dayData.foods.filter(f => f.id !== foodId) });
           const totalKcal = dayData.foods.reduce((sum, food) => sum + (Number(food.kcal) || 0), 0);
           const balance = dayData.tdee - totalKcal;
           const isDeficit = balance > 0;
@@ -190,100 +132,51 @@
             <div className="bg-white rounded-3xl p-5 mb-4 shadow-sm border border-gray-100">
               <div className="flex justify-between items-center mb-4 pb-3 border-b border-gray-100">
                 <div className="flex items-center gap-2 flex-1">
-                  <div className="bg-blue-100 text-blue-600 p-2 rounded-xl">
-                    <CalendarIcon size={18} />
-                  </div>
-                  <input 
-                    type="date" 
-                    value={dateStr}
-                    onChange={handleDateChange}
-                    className="font-semibold text-gray-800 bg-transparent outline-none cursor-pointer hover:bg-gray-50 p-1 rounded-md"
-                  />
+                  <div className="bg-blue-100 text-blue-600 p-2 rounded-xl"><CalendarIcon size={18} /></div>
+                  <input type="date" value={dateStr} onChange={handleDateChange} className="font-semibold text-gray-800 bg-transparent outline-none cursor-pointer hover:bg-gray-50 p-1 rounded-md"/>
                 </div>
-                <button onClick={() => onDelete(dayData.id)} className="text-gray-400 hover:text-red-500 p-1">
-                  <Trash2 size={18} />
-                </button>
+                <button onClick={() => onDelete(dayData.id)} className="text-gray-400 hover:text-red-500 p-1"><Trash2 size={18} /></button>
               </div>
-
               <div className="flex items-center justify-between mb-4 bg-orange-50 p-3 rounded-2xl">
-                <div className="flex items-center gap-2 text-orange-600">
-                  <Flame size={18} />
-                  <span className="text-sm font-medium">TDEE (Calories Burned)</span>
-                </div>
-                <input
-                  type="number"
-                  value={tdee}
-                  onChange={(e) => setTdee(e.target.value)}
-                  onBlur={handleTdeeBlur}
-                  className="w-20 text-right bg-white rounded-lg px-2 py-1 text-sm font-semibold text-orange-700 outline-none border border-orange-200"
-                />
+                <div className="flex items-center gap-2 text-orange-600"><Flame size={18} /><span className="text-sm font-medium">TDEE (Calories Burned)</span></div>
+                <input type="number" value={tdee} onChange={(e) => setTdee(e.target.value)} onBlur={handleTdeeBlur} className="w-20 text-right bg-white rounded-lg px-2 py-1 text-sm font-semibold text-orange-700 outline-none border border-orange-200"/>
               </div>
-
               <div className="mb-4">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2 text-gray-600">
-                    <Utensils size={16} />
-                    <span className="text-sm font-medium">Calories Consumed (Food)</span>
-                  </div>
-                </div>
-                
-                {dayData.foods.map(food => (
-                  <FoodItem key={food.id} food={food} onUpdate={updateFood} onRemove={() => removeFood(food.id)} />
-                ))}
-
-                <button 
-                  onClick={addFood}
-                  className="w-full mt-2 py-2 flex items-center justify-center gap-1 text-sm text-blue-500 bg-blue-50 hover:bg-blue-100 rounded-xl transition-colors font-medium"
-                >
-                  <Plus size={16} /> Add Food Item
-                </button>
+                <div className="flex items-center justify-between mb-2"><div className="flex items-center gap-2 text-gray-600"><Utensils size={16} /><span className="text-sm font-medium">Calories Consumed</span></div></div>
+                {dayData.foods.map(food => <FoodItem key={food.id} food={food} onUpdate={updateFood} onRemove={() => removeFood(food.id)} />)}
+                <button onClick={addFood} className="w-full mt-2 py-2 flex items-center justify-center gap-1 text-sm text-blue-500 bg-blue-50 hover:bg-blue-100 rounded-xl font-medium"><Plus size={16} /> Add Food Item</button>
               </div>
-
               <div className="bg-gray-50 rounded-2xl p-4 mt-2">
-                <div className="flex justify-between text-sm mb-1 text-gray-600">
-                  <span>Total Consumed:</span>
-                  <span className="font-semibold">{totalKcal} kcal</span>
-                </div>
-                <div className="flex justify-between text-sm items-center border-t border-gray-200 mt-2 pt-2">
-                  <span className="text-gray-600">Calorie Balance:</span>
-                  <span className={`font-bold text-lg ${balance === 0 ? 'text-gray-600' : isDeficit ? 'text-green-500' : 'text-red-500'}`}>
-                    {balance > 0 ? '+' : ''}{balance} kcal
-                  </span>
-                </div>
+                <div className="flex justify-between text-sm mb-1 text-gray-600"><span>Total Consumed:</span><span className="font-semibold">{totalKcal} kcal</span></div>
+                <div className="flex justify-between text-sm items-center border-t border-gray-200 mt-2 pt-2"><span className="text-gray-600">Calorie Balance:</span><span className={`font-bold text-lg ${balance === 0 ? 'text-gray-600' : isDeficit ? 'text-green-500' : 'text-red-500'}`}>{balance > 0 ? '+' : ''}{balance} kcal</span></div>
               </div>
             </div>
           );
         };
 
-        // --- Main App Component ---
+        // --- Main App ---
         function App() {
           const [user, setUser] = useState(null);
+          const [systemError, setSystemError] = useState(null); // ตัวแปรเก็บ Error เพื่อโชว์หน้าจอ
           const [days, setDays] = useState([]);
           
           const getLocalMonthStr = () => {
             const now = new Date();
-            const year = now.getFullYear();
-            const month = String(now.getMonth() + 1).padStart(2, '0');
-            return `${year}-${month}`;
+            return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
           };
 
           const [currentMonth, setCurrentMonth] = useState(getLocalMonthStr());
           const [isMonthPickerOpen, setIsMonthPickerOpen] = useState(false);
           const [pickerYear, setPickerYear] = useState(new Date().getFullYear());
-          
           const [activeTab, setActiveTab] = useState('days');
           const [isLoading, setIsLoading] = useState(true);
-
           const [isOnline, setIsOnline] = useState(navigator.onLine);
           const [isOlderExpanded, setIsOlderExpanded] = useState(false);
 
           const englishShortMonths = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-
-          // Dynamic History Tabs based on actual data
           const historyTabs = useMemo(() => {
             const monthsFromData = days.map(d => d.date.slice(0, 7));
-            const allUniqueMonths = [...new Set([...monthsFromData, currentMonth])];
-            return allUniqueMonths.sort().reverse();
+            return [...new Set([...monthsFromData, currentMonth])].sort().reverse();
           }, [days, currentMonth]);
 
           useEffect(() => {
@@ -296,13 +189,15 @@
                 }
               } catch (error) {
                 console.error("Auth error:", error);
+                setSystemError("ล็อกอิน Firebase ล้มเหลว: " + error.message);
+                setIsLoading(false);
               }
             };
             initAuth();
 
             const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
               setUser(currentUser);
-              if (!currentUser) setIsLoading(false);
+              if (!currentUser && !systemError) setIsLoading(false);
             });
             return () => unsubscribe();
           }, []);
@@ -312,193 +207,136 @@
             const handleOffline = () => setIsOnline(false);
             window.addEventListener('online', handleOnline);
             window.addEventListener('offline', handleOffline);
-            return () => {
-              window.removeEventListener('online', handleOnline);
-              window.removeEventListener('offline', handleOffline);
-            };
+            return () => { window.removeEventListener('online', handleOnline); window.removeEventListener('offline', handleOffline); };
           }, []);
 
-          useEffect(() => {
-            setIsOlderExpanded(false);
-          }, [currentMonth]);
+          useEffect(() => { setIsOlderExpanded(false); }, [currentMonth]);
 
           useEffect(() => {
             if (!user) return;
-
             const daysRef = collection(db, 'artifacts', globalAppId, 'users', user.uid, 'diet_days');
-            
             const unsubscribe = onSnapshot(daysRef, (snapshot) => {
               const fetchedDays = [];
-              snapshot.forEach((docSnap) => {
-                fetchedDays.push({ id: docSnap.id, ...docSnap.data() });
-              });
-              fetchedDays.sort((a, b) => new Date(b.date) - new Date(a.date));
-              setDays(fetchedDays);
+              snapshot.forEach((docSnap) => fetchedDays.push({ id: docSnap.id, ...docSnap.data() }));
+              setDays(fetchedDays.sort((a, b) => new Date(b.date) - new Date(a.date)));
               setIsLoading(false);
             }, (error) => {
               console.error("Firestore error:", error);
+              setSystemError("ดึงข้อมูลฐานข้อมูลล้มเหลว: " + error.message);
               setIsLoading(false);
             });
-
             return () => unsubscribe();
           }, [user]);
 
-          const currentMonthDays = useMemo(() => {
-            return days.filter(d => d.date.startsWith(currentMonth));
-          }, [days, currentMonth]);
+          const currentMonthDays = useMemo(() => days.filter(d => d.date.startsWith(currentMonth)), [days, currentMonth]);
 
           const handleRemoveHistoryMonth = async (monthStrToRemove, e) => {
             e.stopPropagation(); 
-            
             if (window.confirm(`Are you sure you want to delete all data for ${monthStrToRemove}?`)) {
-              if (user) {
-                const daysToDelete = days.filter(d => d.date.startsWith(monthStrToRemove));
-                for (const day of daysToDelete) {
-                  const docRef = doc(db, 'artifacts', globalAppId, 'users', user.uid, 'diet_days', day.id);
-                  await deleteDoc(docRef);
+              try {
+                if (user) {
+                  const daysToDelete = days.filter(d => d.date.startsWith(monthStrToRemove));
+                  for (const day of daysToDelete) {
+                    await deleteDoc(doc(db, 'artifacts', globalAppId, 'users', user.uid, 'diet_days', day.id));
+                  }
                 }
-              }
-
-              if (currentMonth === monthStrToRemove) {
-                const remainingMonths = historyTabs.filter(m => m !== monthStrToRemove);
-                setCurrentMonth(remainingMonths.length > 0 ? remainingMonths[0] : getLocalMonthStr());
+                if (currentMonth === monthStrToRemove) {
+                  const remainingMonths = historyTabs.filter(m => m !== monthStrToRemove);
+                  setCurrentMonth(remainingMonths.length > 0 ? remainingMonths[0] : getLocalMonthStr());
+                }
+              } catch (error) {
+                setSystemError("การลบข้อมูลล้มเหลว: " + error.message);
               }
             }
           };
 
           const handleSelectMonthFromPicker = (monthIndex) => {
-            const newMonthStr = `${pickerYear}-${String(monthIndex + 1).padStart(2, '0')}`;
-            setCurrentMonth(newMonthStr);
+            setCurrentMonth(`${pickerYear}-${String(monthIndex + 1).padStart(2, '0')}`);
             setIsMonthPickerOpen(false);
           };
 
           const getMonthName = (yearMonthStr) => {
             const [year, month] = yearMonthStr.split('-');
-            const date = new Date(year, month - 1, 1);
-            return date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+            return new Date(year, month - 1, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
           };
           
           const getShortMonthName = (yearMonthStr) => {
             const [year, month] = yearMonthStr.split('-');
-            const date = new Date(year, month - 1, 1);
-            return `${date.toLocaleDateString('en-US', { month: 'short' })} ${date.getFullYear()}`;
+            return `${new Date(year, month - 1, 1).toLocaleDateString('en-US', { month: 'short' })} ${year}`;
           };
 
           const handleAddDay = async () => {
-            if (!user) return;
-            
-            let newDateStr;
-            const [yearStr, monthStr] = currentMonth.split('-');
-            const year = parseInt(yearStr);
-            const month = parseInt(monthStr) - 1;
-
-            if (currentMonthDays.length === 0) {
-              newDateStr = `${yearStr}-${monthStr}-01`;
-            } else {
-              const datesInMonth = currentMonthDays.map(d => parseInt(d.date.split('-')[2]));
-              const maxDate = Math.max(...datesInMonth);
-              const daysInMonth = new Date(year, month + 1, 0).getDate();
-              
-              let nextDateNum = maxDate + 1;
-              if (nextDateNum > daysInMonth) {
-                nextDateNum = daysInMonth;
-              }
-              
-              newDateStr = `${yearStr}-${monthStr}-${String(nextDateNum).padStart(2, '0')}`;
+            if (systemError) {
+                alert("แอปกำลังติดปัญหา Error สีแดงบนหน้าจอ โปรดแก้ไขก่อนครับ");
+                return;
             }
-
-            const newDocRef = doc(collection(db, 'artifacts', globalAppId, 'users', user.uid, 'diet_days'));
-            const newDay = {
-              date: newDateStr,
-              tdee: 2000,
-              foods: [],
-              createdAt: new Date().toISOString()
-            };
-
-            await setDoc(newDocRef, newDay);
+            if (!user) {
+                setSystemError("ไม่สามารถเพิ่มข้อมูลได้เพราะระบบยังเข้าสู่ระบบไม่ได้ (User is null). โปรดตรวจสอบ Adblocker หรือเบราว์เซอร์");
+                return;
+            }
+            try {
+                let newDateStr;
+                const [yearStr, monthStr] = currentMonth.split('-');
+                if (currentMonthDays.length === 0) {
+                  newDateStr = `${yearStr}-${monthStr}-01`;
+                } else {
+                  const maxDate = Math.max(...currentMonthDays.map(d => parseInt(d.date.split('-')[2])));
+                  const daysInMonth = new Date(parseInt(yearStr), parseInt(monthStr), 0).getDate();
+                  newDateStr = `${yearStr}-${monthStr}-${String(Math.min(maxDate + 1, daysInMonth)).padStart(2, '0')}`;
+                }
+                const newDocRef = doc(collection(db, 'artifacts', globalAppId, 'users', user.uid, 'diet_days'));
+                await setDoc(newDocRef, { date: newDateStr, tdee: 2000, foods: [], createdAt: new Date().toISOString() });
+            } catch (error) {
+                setSystemError("บันทึกข้อมูลล้มเหลว: " + error.message);
+            }
           };
 
           const handleUpdateDay = async (dayId, updatedData) => {
             if (!user) return;
-            const docRef = doc(db, 'artifacts', globalAppId, 'users', user.uid, 'diet_days', dayId);
-            await setDoc(docRef, updatedData, { merge: true });
+            try { await setDoc(doc(db, 'artifacts', globalAppId, 'users', user.uid, 'diet_days', dayId), updatedData, { merge: true }); } 
+            catch (error) { setSystemError("อัปเดตข้อมูลล้มเหลว: " + error.message); }
           };
 
           const handleDeleteDay = async (dayId) => {
             if (!user) return;
-            const docRef = doc(db, 'artifacts', globalAppId, 'users', user.uid, 'diet_days', dayId);
-            await deleteDoc(docRef);
+            try { await deleteDoc(doc(db, 'artifacts', globalAppId, 'users', user.uid, 'diet_days', dayId)); } 
+            catch (error) { setSystemError("ลบข้อมูลล้มเหลว: " + error.message); }
           };
 
           const calculateSummary = (dataArray) => {
-            let totalTDEE = 0;
-            let totalKcal = 0;
-            
-            dataArray.forEach(d => {
-              totalTDEE += Number(d.tdee) || 0;
-              d.foods.forEach(f => {
-                totalKcal += Number(f.kcal) || 0;
-              });
-            });
-
+            let totalTDEE = 0, totalKcal = 0;
+            dataArray.forEach(d => { totalTDEE += Number(d.tdee) || 0; d.foods.forEach(f => totalKcal += Number(f.kcal) || 0); });
             return { totalTDEE, totalKcal, balance: totalTDEE - totalKcal };
           };
 
           const monthlySummary = calculateSummary(currentMonthDays);
           const overallSummary = calculateSummary(days);
-
           const todayFormatted = new Date().toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long' });
 
-          if (isLoading) {
-            return (
-              <div className="flex h-screen w-full items-center justify-center bg-[#F2F2F7]">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
-              </div>
-            );
-          }
+          if (isLoading) return <div className="flex h-screen w-full items-center justify-center bg-[#F2F2F7]"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div></div>;
 
           return (
             <div className="min-h-screen bg-[#F2F2F7] font-sans pb-24 md:max-w-md md:mx-auto md:shadow-2xl md:min-h-[800px] md:rounded-[3rem] md:my-8 overflow-hidden relative border border-gray-200">
               
-              {/* Dark Theme Month Picker Modal */}
               {isMonthPickerOpen && (
                 <div className="absolute inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-in fade-in duration-200">
                   <div className="bg-[#282828] w-full max-w-[320px] rounded-xl shadow-2xl overflow-hidden text-gray-200 p-5">
-                    
-                    {/* Header (Current Date) */}
                     <div className="flex justify-between items-center mb-6 border-b border-white/10 pb-4">
                       <span className="font-medium text-white text-[15px]">{todayFormatted}</span>
-                      <button onClick={() => setIsMonthPickerOpen(false)} className="bg-white/5 p-1 rounded-md hover:bg-white/10 transition-colors">
-                        <ChevronDown size={18} />
-                      </button>
+                      <button onClick={() => setIsMonthPickerOpen(false)} className="bg-white/5 p-1 rounded-md hover:bg-white/10"><ChevronDown size={18} /></button>
                     </div>
-                    
-                    {/* Year Selector */}
                     <div className="flex items-center justify-between bg-white/5 rounded-lg p-3 mb-6">
                       <span className="font-semibold text-lg text-white pl-2">{pickerYear}</span>
                       <div className="flex gap-1 pr-1">
-                        <button onClick={() => setPickerYear(p => p + 1)} className="p-1 hover:bg-white/10 rounded">
-                          <ChevronUp size={20} />
-                        </button>
-                        <button onClick={() => setPickerYear(p => p - 1)} className="p-1 hover:bg-white/10 rounded">
-                          <ChevronDown size={20} />
-                        </button>
+                        <button onClick={() => setPickerYear(p => p + 1)} className="p-1 hover:bg-white/10 rounded"><ChevronUp size={20} /></button>
+                        <button onClick={() => setPickerYear(p => p - 1)} className="p-1 hover:bg-white/10 rounded"><ChevronDown size={20} /></button>
                       </div>
                     </div>
-
-                    {/* Month Grid (4x3 layout) */}
                     <div className="grid grid-cols-4 gap-y-6 gap-x-2 pb-2">
                       {englishShortMonths.map((m, index) => {
                         const isCurrentSelected = currentMonth === `${pickerYear}-${String(index + 1).padStart(2, '0')}`;
                         return (
-                          <button
-                            key={index}
-                            onClick={() => handleSelectMonthFromPicker(index)}
-                            className={`flex justify-center items-center h-14 w-14 mx-auto rounded-full font-medium transition-colors text-[13px]
-                              ${isCurrentSelected 
-                                ? 'bg-[#33B5E5] text-white shadow-lg shadow-[#33B5E5]/30' 
-                                : 'hover:bg-white/10 text-gray-300'}`}
-                          >
+                          <button key={index} onClick={() => handleSelectMonthFromPicker(index)} className={`flex justify-center items-center h-14 w-14 mx-auto rounded-full font-medium transition-colors text-[13px] ${isCurrentSelected ? 'bg-[#33B5E5] text-white shadow-lg shadow-[#33B5E5]/30' : 'hover:bg-white/10 text-gray-300'}`}>
                             {m}
                           </button>
                         );
@@ -508,65 +346,58 @@
                 </div>
               )}
 
-              {/* Top Navigation */}
               <div className="bg-white pt-10 pb-3 px-4 shadow-sm sticky top-0 z-10 rounded-b-3xl">
                 <div className="flex justify-between items-center mb-4 px-2">
-                  <div className="flex items-center gap-3">
-                    <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Diet Tracker</h1>
-                    <div className={`flex items-center gap-1 text-[10px] px-2 py-1 rounded-full font-medium transition-colors ${isOnline ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'}`}>
-                      {isOnline ? <Wifi size={12} /> : <WifiOff size={12} />}
-                      <span>{isOnline ? 'Online' : 'Offline'}</span>
+                  <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Diet Tracker</h1>
+                  
+                  {/* เปลี่ยนจุดแสดงสถานะ ให้โชว์เลยว่า User Login ติดปัญหาหรือไม่ */}
+                  {!user || systemError ? (
+                    <div className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-full font-medium bg-red-100 text-red-600">
+                      <WifiOff size={12} /><span>Auth Error</span>
                     </div>
-                  </div>
+                  ) : (
+                    <div className={`flex items-center gap-1 text-[10px] px-2 py-1 rounded-full font-medium transition-colors ${isOnline ? 'bg-green-100 text-green-600' : 'bg-orange-100 text-orange-600'}`}>
+                      <Wifi size={12} /><span>{isOnline ? 'Online' : 'Offline'}</span>
+                    </div>
+                  )}
                 </div>
                 
-                <button 
-                  onClick={() => {
-                    setPickerYear(parseInt(currentMonth.split('-')[0]));
-                    setIsMonthPickerOpen(true);
-                  }}
-                  className="w-full flex items-center justify-between bg-gray-50 hover:bg-gray-100 rounded-2xl p-3 px-4 border border-gray-100 transition-colors"
-                >
-                  <span className="font-semibold text-gray-800 text-lg">
-                    {getMonthName(currentMonth)}
-                  </span>
+                <button onClick={() => { setPickerYear(parseInt(currentMonth.split('-')[0])); setIsMonthPickerOpen(true); }} className="w-full flex items-center justify-between bg-gray-50 hover:bg-gray-100 rounded-2xl p-3 px-4 border border-gray-100 transition-colors">
+                  <span className="font-semibold text-gray-800 text-lg">{getMonthName(currentMonth)}</span>
                   <ChevronDown size={20} className="text-gray-500" />
                 </button>
 
-                {/* History Tabs */}
                 {historyTabs.length > 1 && (
                   <div className="flex gap-2 mt-3 overflow-x-auto pb-1 no-scrollbar px-1">
                     {historyTabs.map(monthStr => (
-                      <div
-                        key={monthStr}
-                        onClick={() => setCurrentMonth(monthStr)}
-                        className={`flex items-center gap-1 whitespace-nowrap pl-4 pr-1.5 py-1.5 rounded-full text-xs font-medium transition-colors border cursor-pointer
-                          ${currentMonth === monthStr 
-                            ? 'bg-blue-50 border-blue-200 text-blue-600' 
-                            : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'}`}
-                      >
+                      <div key={monthStr} onClick={() => setCurrentMonth(monthStr)} className={`flex items-center gap-1 whitespace-nowrap pl-4 pr-1.5 py-1.5 rounded-full text-xs font-medium transition-colors border cursor-pointer ${currentMonth === monthStr ? 'bg-blue-50 border-blue-200 text-blue-600' : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'}`}>
                         <span>{getShortMonthName(monthStr)}</span>
-                        <button 
-                          onClick={(e) => handleRemoveHistoryMonth(monthStr, e)}
-                          className={`p-0.5 rounded-full transition-colors ${currentMonth === monthStr ? 'hover:bg-blue-200' : 'hover:bg-gray-200'}`}
-                        >
-                          <X size={12} />
-                        </button>
+                        <button onClick={(e) => handleRemoveHistoryMonth(monthStr, e)} className={`p-0.5 rounded-full transition-colors ${currentMonth === monthStr ? 'hover:bg-blue-200' : 'hover:bg-gray-200'}`}><X size={12} /></button>
                       </div>
                     ))}
                   </div>
                 )}
               </div>
 
-              {/* Main Content Area */}
               <div className="p-4 h-full overflow-y-auto">
                 
+                {/* กล่องแสดง Error สีแดง จะโชว์ขึ้นมาถ้ามีปัญหา */}
+                {systemError && (
+                  <div className="bg-red-50 border border-red-200 text-red-700 p-4 rounded-2xl mb-4 text-sm animate-in fade-in">
+                    <div className="flex items-center gap-2 font-bold mb-1"><AlertCircle size={18}/> ตรวจพบข้อผิดพลาด:</div>
+                    <p className="break-words">{systemError}</p>
+                    <p className="mt-2 text-xs text-red-500">*กรุณากด F12 เพื่อดู Console หรือตรวจสอบว่าบราวเซอร์บล็อกการทำงานหรือไม่</p>
+                  </div>
+                )}
+
                 {activeTab === 'days' && (
                   <div className="animate-in fade-in slide-in-from-bottom-4 duration-300">
                     
                     <button 
                       onClick={handleAddDay}
-                      className="w-full mb-6 bg-blue-500 hover:bg-blue-600 text-white font-semibold py-4 rounded-2xl shadow-sm shadow-blue-200 flex items-center justify-center gap-2 transition-transform active:scale-95"
+                      disabled={!!systemError || !user}
+                      className={`w-full mb-6 text-white font-semibold py-4 rounded-2xl shadow-sm flex items-center justify-center gap-2 transition-all active:scale-95 
+                        ${systemError || !user ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-500 hover:bg-blue-600 shadow-blue-200'}`}
                     >
                       <Plus size={20} /> Add Day ({getMonthName(currentMonth)})
                     </button>
@@ -579,33 +410,16 @@
                       </div>
                     ) : (
                       <>
-                        <DayCard 
-                          key={currentMonthDays[0].id} 
-                          dayData={currentMonthDays[0]} 
-                          onUpdate={handleUpdateDay} 
-                          onDelete={handleDeleteDay} 
-                        />
-
+                        <DayCard key={currentMonthDays[0].id} dayData={currentMonthDays[0]} onUpdate={handleUpdateDay} onDelete={handleDeleteDay} />
                         {currentMonthDays.length > 1 && (
                           <div className="mt-6 mb-4">
-                            <button
-                              onClick={() => setIsOlderExpanded(!isOlderExpanded)}
-                              className="w-full flex items-center justify-center gap-2 bg-gray-200/50 hover:bg-gray-200 text-gray-600 font-medium py-3 rounded-2xl transition-colors text-sm"
-                            >
+                            <button onClick={() => setIsOlderExpanded(!isOlderExpanded)} className="w-full flex items-center justify-center gap-2 bg-gray-200/50 hover:bg-gray-200 text-gray-600 font-medium py-3 rounded-2xl transition-colors text-sm">
                               Previous records this month ({currentMonthDays.length - 1} days)
                               {isOlderExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                             </button>
-
                             {isOlderExpanded && (
                               <div className="mt-4 space-y-4 animate-in fade-in slide-in-from-top-4 duration-300">
-                                {currentMonthDays.slice(1).map(day => (
-                                  <DayCard 
-                                    key={day.id} 
-                                    dayData={day} 
-                                    onUpdate={handleUpdateDay} 
-                                    onDelete={handleDeleteDay} 
-                                  />
-                                ))}
+                                {currentMonthDays.slice(1).map(day => <DayCard key={day.id} dayData={day} onUpdate={handleUpdateDay} onDelete={handleDeleteDay} />)}
                               </div>
                             )}
                           </div>
@@ -617,75 +431,34 @@
 
                 {activeTab === 'summary' && (
                   <div className="animate-in fade-in slide-in-from-bottom-4 duration-300 space-y-6">
-                    
                     <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100">
-                      <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
-                        <PieChart size={20} className="text-blue-500"/> Monthly Summary: {getMonthName(currentMonth)}
-                      </h2>
+                      <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2"><PieChart size={20} className="text-blue-500"/> Monthly Summary: {getMonthName(currentMonth)}</h2>
                       <div className="space-y-4">
-                        <div className="flex justify-between items-center p-3 bg-orange-50 rounded-2xl">
-                          <span className="text-orange-700 font-medium">Total TDEE</span>
-                          <span className="font-bold text-orange-700">{monthlySummary.totalTDEE.toLocaleString()} kcal</span>
-                        </div>
-                        <div className="flex justify-between items-center p-3 bg-gray-50 rounded-2xl">
-                          <span className="text-gray-700 font-medium">Total Consumed</span>
-                          <span className="font-bold text-gray-700">{monthlySummary.totalKcal.toLocaleString()} kcal</span>
-                        </div>
-                        <div className="flex justify-between items-center p-4 bg-blue-50 rounded-2xl border border-blue-100">
-                          <span className="text-blue-800 font-semibold">Energy Balance</span>
-                          <span className={`font-bold text-xl ${monthlySummary.balance > 0 ? 'text-green-600' : 'text-red-500'}`}>
-                            {monthlySummary.balance > 0 ? '+' : ''}{monthlySummary.balance.toLocaleString()} kcal
-                          </span>
-                        </div>
+                        <div className="flex justify-between items-center p-3 bg-orange-50 rounded-2xl"><span className="text-orange-700 font-medium">Total TDEE</span><span className="font-bold text-orange-700">{monthlySummary.totalTDEE.toLocaleString()} kcal</span></div>
+                        <div className="flex justify-between items-center p-3 bg-gray-50 rounded-2xl"><span className="text-gray-700 font-medium">Total Consumed</span><span className="font-bold text-gray-700">{monthlySummary.totalKcal.toLocaleString()} kcal</span></div>
+                        <div className="flex justify-between items-center p-4 bg-blue-50 rounded-2xl border border-blue-100"><span className="text-blue-800 font-semibold">Energy Balance</span><span className={`font-bold text-xl ${monthlySummary.balance > 0 ? 'text-green-600' : 'text-red-500'}`}>{monthlySummary.balance > 0 ? '+' : ''}{monthlySummary.balance.toLocaleString()} kcal</span></div>
                       </div>
                     </div>
-
                     <div className="bg-gradient-to-br from-blue-500 to-indigo-600 rounded-3xl p-6 shadow-md text-white">
-                      <h2 className="text-lg font-bold mb-4 flex items-center gap-2 opacity-90">
-                        <Activity size={20} /> All-time Calorie Overview
-                      </h2>
+                      <h2 className="text-lg font-bold mb-4 flex items-center gap-2 opacity-90"><Activity size={20} /> All-time Calorie Overview</h2>
                       <div className="grid grid-cols-2 gap-4 mb-4">
-                        <div className="bg-white/10 rounded-2xl p-4 backdrop-blur-sm">
-                          <div className="text-sm opacity-80 mb-1">Total TDEE</div>
-                          <div className="font-bold text-xl">{overallSummary.totalTDEE.toLocaleString()}</div>
-                        </div>
-                        <div className="bg-white/10 rounded-2xl p-4 backdrop-blur-sm">
-                          <div className="text-sm opacity-80 mb-1">Total Consumed</div>
-                          <div className="font-bold text-xl">{overallSummary.totalKcal.toLocaleString()}</div>
-                        </div>
+                        <div className="bg-white/10 rounded-2xl p-4 backdrop-blur-sm"><div className="text-sm opacity-80 mb-1">Total TDEE</div><div className="font-bold text-xl">{overallSummary.totalTDEE.toLocaleString()}</div></div>
+                        <div className="bg-white/10 rounded-2xl p-4 backdrop-blur-sm"><div className="text-sm opacity-80 mb-1">Total Consumed</div><div className="font-bold text-xl">{overallSummary.totalKcal.toLocaleString()}</div></div>
                       </div>
-                      <div className="bg-white/20 rounded-2xl p-4 backdrop-blur-sm flex justify-between items-center">
-                        <span className="font-medium">Net Calorie Balance</span>
-                        <span className="font-bold text-2xl">
-                          {overallSummary.balance > 0 ? '+' : ''}{overallSummary.balance.toLocaleString()}
-                        </span>
-                      </div>
-                      <p className="text-xs text-center mt-3 opacity-70">
-                        *Positive (+) means you burned more than you ate (Calorie Deficit)
-                      </p>
+                      <div className="bg-white/20 rounded-2xl p-4 backdrop-blur-sm flex justify-between items-center"><span className="font-medium">Net Calorie Balance</span><span className="font-bold text-2xl">{overallSummary.balance > 0 ? '+' : ''}{overallSummary.balance.toLocaleString()}</span></div>
+                      <p className="text-xs text-center mt-3 opacity-70">*Positive (+) means you burned more than you ate (Calorie Deficit)</p>
                     </div>
-
                   </div>
                 )}
               </div>
 
-              {/* Bottom Tab Bar */}
               <div className="absolute bottom-0 w-full bg-white/80 backdrop-blur-md border-t border-gray-200 px-6 py-4 pb-8 md:pb-6 rounded-b-[3rem]">
                 <div className="flex justify-around items-center">
-                  <button 
-                    onClick={() => setActiveTab('days')}
-                    className={`flex flex-col items-center gap-1 transition-colors ${activeTab === 'days' ? 'text-blue-500' : 'text-gray-400'}`}
-                  >
-                    <CalendarIcon size={24} className={activeTab === 'days' ? 'fill-blue-50' : ''} />
-                    <span className="text-[10px] font-medium">Calendar</span>
+                  <button onClick={() => setActiveTab('days')} className={`flex flex-col items-center gap-1 transition-colors ${activeTab === 'days' ? 'text-blue-500' : 'text-gray-400'}`}>
+                    <CalendarIcon size={24} className={activeTab === 'days' ? 'fill-blue-50' : ''} /><span className="text-[10px] font-medium">Calendar</span>
                   </button>
-                  
-                  <button 
-                    onClick={() => setActiveTab('summary')}
-                    className={`flex flex-col items-center gap-1 transition-colors ${activeTab === 'summary' ? 'text-blue-500' : 'text-gray-400'}`}
-                  >
-                    <PieChart size={24} className={activeTab === 'summary' ? 'fill-blue-50' : ''} />
-                    <span className="text-[10px] font-medium">Summary</span>
+                  <button onClick={() => setActiveTab('summary')} className={`flex flex-col items-center gap-1 transition-colors ${activeTab === 'summary' ? 'text-blue-500' : 'text-gray-400'}`}>
+                    <PieChart size={24} className={activeTab === 'summary' ? 'fill-blue-50' : ''} /><span className="text-[10px] font-medium">Summary</span>
                   </button>
                 </div>
               </div>
