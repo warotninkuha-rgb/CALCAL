@@ -56,10 +56,10 @@
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     
-    <!-- Babel (ตัวแปลงภาษา React ให้รันบน Browser ได้) -->
+    <!-- Babel -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
-    <!-- Import Map: บอก Browser ว่าจะโหลด Package ต่างๆ จากที่ไหน -->
+    <!-- Import Map -->
     <script type="importmap">
     {
         "imports": {
@@ -279,6 +279,7 @@
 
           const englishShortMonths = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
+          // Dynamic History Tabs based on actual data
           const historyTabs = useMemo(() => {
             const monthsFromData = days.map(d => d.date.slice(0, 7));
             const allUniqueMonths = [...new Set([...monthsFromData, currentMonth])];
